@@ -39,6 +39,80 @@
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
 
+1. The user sends the text with a post request to /submit route.
+2. The submit route reads the JSON it received, pulls out `text` and `creator_id`, and rejects bad input. It then creates a `content_id` uuid.
+3. GPT-2 reads the text and measures the perplexity, meaning how unexpected each next word is. **Blind spot: it measures predictability, not authorship, so plain writing in common words can score as AI**
+4. stylometry.style_signal measures how much sentence length varies, how varied the vocabulary the is, and how much punctuation there is, but it also doesn't understand text. It adds a `style_score`, which is between 0 and 1, with higher scores meaning that the text is more AI like. **Blind spot: it can't read, so typos or a pasted quote can move the score when they shouldn't** 
+5. scoring.combine_signals merges the two scores(perplexity and style score), into one(takes weighted average) and adds it as the  `combined_score`. Here we decide what happens when two signals disagree. 
+6. scoring.score_to_label compares the score to the thresholds(0.35 -> human, above 0.65 -> AI, in between -> unsure). It adds a short `guess` and the plain English label sentence.
+7. audit.log_decision writes the content_id, creator_id, both signal scores, the combined score, guess, label, and status to logs/audit.jsonl. It then returns those fields to the caller, and the reader sees the label. This adds the permanent record. If the writer appeals, a second entry with `under_review` is added to the first one without anything being overwritten. 
+
+### The contract
+
+<!-- What goes in and what comes out of each endpoint, field by field.
+     Fill in every ___ before building. Test: could someone build against
+     this without asking me a question? -->
+
+All bodies are JSON. Every error response has the same shape:
+`{"error": "<code>", "message": "<readable explanation>"}`.
+
+#### `POST /submit`
+
+**Request**
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `text` | string | yes | The writing to check |
+| `creator_id` | string | yes | Who is submitting it |
+
+**Response `200`**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `content_id` | string (uuid) | ID for this submission. Needed to appeal |
+| `guess` | `"human"` / `"unsure"` / `"ai"` | Machine-readable verdict, exactly one of these lowercase strings |
+| `confidence` | float 0–1 | ___ <!-- the combined score, or how far it is from 0.5? --> |
+| `label` | string | The plain-English sentence the writer sees |
+| `model_score` | float 0–1 | Signal one. Higher = more AI-like |
+| `style_score` | float 0–1 | Signal two. Higher = more AI-like |
+| `combined_score` | float 0–1 | The combined score the label was picked from |
+
+**Errors**
+
+| Case | Status | `error` |
+|---|---|---|
+| Body isn't JSON, or `text` / `creator_id` missing or not a string | `400` | `bad_request` |
+| `text` empty or too short to score (fewer than ___ words) | ___ | `text_too_short` |
+| `text` longer than ___ characters | `413` | `text_too_long` |
+| Too many requests (unit 8) | `429` | `rate_limited` |
+
+#### `POST /appeal`
+
+**Request**
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `content_id` | string | yes | From the `/submit` response |
+| `reasoning` | string | yes | Why the writer thinks the label is wrong |
+
+`creator_id` is ___ <!-- not needed (copied from the original log entry), or required? -->
+
+**Response `200`**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `content_id` | string | Echoed back |
+| `status` | `"under_review"` | The item's new status |
+| `message` | string | A confirmation the writer can read |
+
+**Errors**
+
+| Case | Status | `error` |
+|---|---|---|
+| `content_id` or `reasoning` missing or empty | `400` | `bad_request` |
+| `content_id` not in the log | `404` | `not_found` |
+| Item already under review | ___ | ___ <!-- 409 already_under_review, or accept and log a second appeal? --> |
+
 
 
 ---
@@ -54,23 +128,40 @@
 ### Signal one — the model signal
 
 **What it measures:**
+It measures how unpredicatable or predictable a sequence of words is, also known as the perplexity. 
 
 **Why that might differ between human and AI writing:**
+Humans tend to have higher perplexity scores than AI when writing because humans are less predictable than AI.
 
 **What it can't see:**
+It might wrongly classify predicatable writing, since it has a lower perplexity score, as AI written, even if it's written by a human who happens to write predictably. That could include a new speaker or writer to the language or a younger writer. The reverse could also happen with more unpredicatble writing being classified as human even when it originated from AI because it has a unique sequence of words. In short, the score can't see authorship.
 
 ### Signal two — the style signal
 
 **What it measures:**
+It measures the shape of the input text and specific traits within the text.
 
 **Why that might differ between human and AI writing:**
+AI writing tends to have even, mid-length sentences from a shorter ranged vocabulary, while human writing
+tends to be less consistent.
 
 **What it can't see:**
-
+The signal can't read, and doesn't pull any semantic knowledge from the text. Anything that changes the shape, like adding typos, breaking up sentences, or pasting a quotation can change the score.
 ### The combining rule
 
 <!-- Write the rule in words, then give the numbers. What happens when the two
-     signals disagree? -->
+     signals disagree? 
+     
+
+     Two things to decide and write down:
+
+      1. Which direction each measure points. Low spread means more AI-ish, so
+         it needs flipping. Work out which of your three need that.
+      2. How to get each onto a comparable scale. A raw type-token ratio sits
+         between 0 and 1; a raw punctuation count doesn't. Adding them
+         unscaled means whichever has the bigger numbers wins by default.
+     
+     -->
 
 **The rule:**
 
@@ -159,15 +250,15 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 
 **Moment 1**
 
-- *What I asked for:*
+- *What I asked for:* I was confused about where to start and where to look in order to  fill out the seven steps
 - *What came back:*
 - *What I changed:*
 
 **Moment 2**
 
-- *What I asked for:*
+- *What I asked for:* I wanted to confirm my knowledge of the two endpoint shapes was correct
 - *What came back:*
-- *What I changed:*
+- *What I changed:* I confirmed Claude's suggestion to add notes to the README describing the two endpoints. 
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
