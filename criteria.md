@@ -43,24 +43,23 @@ Two things worth knowing before you pick numbers:
 
 ---
 ## 1.
-
-<!-- Your criterion. It must name a number. -->
+For each trial run, out of the 10 paragraphs I wrote myself, at most 1 is labelled as high confidence AI.
 
 
 
 **Why this target:**
-
+I chose this target to ensure that false positives are held to a standard, and specifically chose at most 1 being labelled incorrectly as AI because I understand that it's difficult to be compleletely accurate when basing the classification on only stylometry and perplexity when humans can write text that's predictable in style and wording. I chose 9/10 to be the goal since a false accusation costs the writer a lot, and because commercial detectors seem to have a false positive rate between 1 and 10 percent. 
 
 
 ---
 
 ## 2.
-
-<!-- Your criterion. -->
+For each trial, the average combined score of 5 texts I know are AI-generated is at least 0.45 higher than the average combined score of 5 texts I know a human wrote.
 
 
 
 **Why this target:**
+The unsure range is from 0.35 to 0.65, so a band of 0.45 is slightly larger. 0.45 means that on average, my known-AI texts and known-human texts land outside the unsure band and get a solid classification with about 0.075 to spare. A smaller gap would mean signals barely separate the two, and the label could be left up to chance.
 
 
 
@@ -68,11 +67,11 @@ Two things worth knowing before you pick numbers:
 
 ## 3.
 
-<!-- Your criterion. -->
-
+For each of three trials, I submit 5 texts and appeal each one using the `content_id` it returned. All 5 appeals return `200` with `status: "under_review"`, and `/log` shows a new `under_review` entry for each of those `content_id`s, with the original `decided` entry still in place. An appeal with a made-up `content_id` returns `404` and adds nothing to the log. (Tested by hand with curl — `run_eval.py` only calls `/submit`.)
 
 
 **Why this target:**
+It's really important for the user's appeal to be recognized by the system because it's the only way a wrongly accused writer can push back. An AI or a model isn't involved, so this should be something deterministic and not left up to chance.
 
 
 
@@ -80,23 +79,22 @@ Two things worth knowing before you pick numbers:
 
 ## 4.
 
-<!-- Your criterion. -->
-
+For each of three trials, all 6 malformed requests in my "bad input" scenario are refused with the status my contract in `README.md` gives them, and none returns a `500` or a label. The 6 are: empty `text`, whitespace-only `text`, no `text` field, `text` set to `null`, a two-word `text`, and a 50,000-word `text`. The oversized one gets `413`; the other five get `400`.
 
 
 **Why this target:**
-
-
+Each of the malformed request leaves nothing to evaluate properly, so the system should refuse it and tell the user what to fix rather than crash. This check doesn't involve the model, so it should hold for all 6 every time.
 
 ---
 
 ## 5.
 
-<!-- Your criterion. -->
+For each of three trials, my "label coverage" scenario (3 known-AI texts, 3 known-human texts, 3 borderline texts) produces all three labels, and each label is reached by at least one text from its own group: a known-AI text gets "ai", a known-human text gets "human", and a borderline text gets "unsure".
 
 
 
 **Why this target:**
+A label that no text can produce is broken since the writer never sees it. Requiring the right group prevents the criterion from being reached when a wrong classification is given. The human label is most likely to be missing, since averaging pulls scores toward the middle.
 
 
 
