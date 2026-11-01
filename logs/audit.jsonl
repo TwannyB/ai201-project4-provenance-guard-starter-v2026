@@ -1,1 +1,2 @@
 {"timestamp": "2026-10-31T20:40:48+00:00", "content_id": "b70a5ba5-3615-44b6-a347-10d9dc30a0f4", "creator_id": "test", "guess": "unsure", "model_score": 0.8809, "style_score": null, "combined_score": null, "label": "PLACEHOLDER label", "status": "decided"}
+{"timestamp": "2026-11-01T04:40:32+00:00", "content_id": "a3c9e5f4-e5a9-40ee-a536-c9e0a2539019", "creator_id": "sample-writer", "guess": "unsure", "model_score": 0.8864, "style_score": null, "combined_score": null, "label": "PLACEHOLDER label", "status": "decided"}

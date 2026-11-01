@@ -212,14 +212,25 @@ The signal can't read, and doesn't pull any semantic knowledge from the text. An
      two off the response, so leaving them out costs you next unit's
      diagnostics. -->
 
+<!-- Milestone 3 run: signal one only. Re-run once labels and the second
+     signal are in (Milestone 5) and replace this. -->
+
 ```bash
 $ curl -X POST http://127.0.0.1:5000/submit \
   -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+  -d '{"text": "The implementation of the proposed framework requires careful consideration of several key factors. First, it is important to note that the system must be able to handle a wide variety of different inputs. Additionally, the overall performance of the solution depends on a number of important variables.", "creator_id": "sample-writer"}'
 ```
 
 ```json
-
+{
+  "combined_score": null,
+  "confidence": 0.5,
+  "content_id": "a3c9e5f4-e5a9-40ee-a536-c9e0a2539019",
+  "guess": "unsure",
+  "label": "PLACEHOLDER label",
+  "model_score": 0.8864,
+  "style_score": null
+}
 ```
 
 **An appeal**
@@ -241,7 +252,33 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 ```
 
 ```json
-
+{
+  "count": 2,
+  "entries": [
+    {
+      "combined_score": null,
+      "content_id": "b70a5ba5-3615-44b6-a347-10d9dc30a0f4",
+      "creator_id": "test",
+      "guess": "unsure",
+      "label": "PLACEHOLDER label",
+      "model_score": 0.8809,
+      "status": "decided",
+      "style_score": null,
+      "timestamp": "2026-10-31T20:40:48+00:00"
+    },
+    {
+      "combined_score": null,
+      "content_id": "a3c9e5f4-e5a9-40ee-a536-c9e0a2539019",
+      "creator_id": "sample-writer",
+      "guess": "unsure",
+      "label": "PLACEHOLDER label",
+      "model_score": 0.8864,
+      "status": "decided",
+      "style_score": null,
+      "timestamp": "2026-11-01T04:40:32+00:00"
+    }
+  ]
+}
 ```
 
 ---
