@@ -30,6 +30,7 @@ from flask import Flask, jsonify, request
 
 import audit
 import config
+import detector
 
 app = Flask(__name__)
 
@@ -199,17 +200,54 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json() or {}
 
-    # TODO: delete this and build the route.
+    text = payload.get("text", "")
+    creator_id = payload.get("creator_id", "")
+
+    if not text:
+        return jsonify({
+            "error": "empty text",
+            "message": "The submitted text field was empty; you must enter text to be evaluated.",
+            "you_sent": {
+                "text_length": len(payload.get("text", "")),
+                "creator_id": payload.get("creator_id")
+            }
+        })
+
+    content_id = str(uuid.uuid4())
+
+    try:
+        model_score = detector.model_signal(text)
+    except ValueError as exc:
+        # Fewer than 3 tokens — nothing for the model to be surprised by.
+        return jsonify({"error": "text_too_short", "message": str(exc)}), 400
+    except detector.DetectorUnavailable as exc:
+        # The model isn't downloaded or won't load — our problem, not the caller's.
+        return jsonify({"error": "detector_unavailable", "message": str(exc)}), 503
+
+    # Log what the writer is about to be told, before telling them.
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess="unsure",
+        model_score=model_score,
+        style_score=None,
+        combined_score=None,
+        label="PLACEHOLDER label",
+        status="decided",
+    )
+
+    # Milestone 3, pass 2: signal one is real; the rest are placeholders.
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": "unsure",
+        "confidence": 0.5,
+        "label": "PLACEHOLDER label",
+        "model_score": model_score,
+        "style_score": None,
+        "combined_score": None,
+    })
 
 
 @app.post("/appeal")
