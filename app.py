@@ -280,14 +280,49 @@ def appeal():
     to the person on the other end. It's the only thing standing between a
     wrong accusation and nothing at all.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    # A body that parses as JSON but isn't an object (a list, a string) has no .get.
+    if not isinstance(payload, dict):
+        payload = {}
 
-    # TODO: delete this and build the route.
+    content_id = payload.get("content_id")
+    reasoning = payload.get("reasoning")
+
+    if not isinstance(content_id, str) or not content_id.strip() \
+            or not isinstance(reasoning, str) or not reasoning.strip():
+        return jsonify({
+            "error": "bad_request",
+            "message": "An appeal needs both a content_id and your reasoning.",
+        }), 400
+
+    entries = audit.entries_for(content_id)
+    if not entries:
+        # Nothing is logged: there's no decision here to appeal.
+        return jsonify({
+            "error": "not_found",
+            "message": f"No submission found with content_id '{content_id}'.",
+        }), 404
+
+    if any(e.get("status") == "under_review" for e in entries):
+        return jsonify({
+            "error": "already_under_review",
+            "message": "This result has already been appealed and is under review.",
+        }), 409
+
+    # The writer doesn't send creator_id; it comes from the original decision,
+    # so nobody can appeal under someone else's name.
+    original = next((e for e in entries if e.get("status") == "decided"), entries[0])
+    audit.log_appeal(
+        content_id=content_id,
+        creator_id=original.get("creator_id", "unknown"),
+        reasoning=reasoning,
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+        "content_id": content_id,
+        "status": "under_review",
+        "message": "Your appeal has been recorded, and this result is now under review.",
+    })
 
 
 # ── Already works ─────────────────────────────────────────────────────────────
