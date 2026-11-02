@@ -82,8 +82,8 @@ All bodies are JSON. Every error response has the same shape:
 | Case | Status | `error` |
 |---|---|---|
 | Body isn't JSON, or `text` / `creator_id` missing or not a string | `400` | `bad_request` |
-| `text` empty or too short to score (fewer than ___ words) | `400` | `text_too_short` |
-| `text` longer than ___ characters | `413` | `text_too_long` |
+| `text` empty or too short to score (fewer than 5 words) | `400` | `text_too_short` |
+| `text` longer than 10,000 characters | `413` | `text_too_long` |
 | Too many requests (unit 8) | `429` | `rate_limited` |
 
 #### `POST /appeal`
@@ -307,7 +307,7 @@ The original `decided` entry stays where it was; the appeal is a new
 **Moment 1**
 
 - *What I asked for:* I was confused about where to start and where to look in order to  fill out the seven steps
-- *What came back:*
+- *What came back
 - *What I changed:*
 
 **Moment 2**

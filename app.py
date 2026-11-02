@@ -153,6 +153,16 @@ def health():
 
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
 
+def _reject(status, error, message, creator_id):
+    """
+    Refuse a request and leave a trace of it. Logs who and why — never the
+    text itself, which could be a huge attack payload or someone's writing.
+    """
+    who = creator_id if isinstance(creator_id, str) and creator_id.strip() else "unknown"
+    audit.log_rejection(creator_id=who, reason=error)
+    return jsonify({"error": error, "message": message}), status
+
+
 @app.post("/submit")
 # @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
@@ -202,28 +212,37 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json() or {}
+    payload = request.get_json(silent=True)
+    # A body that parses as JSON but isn't an object (a list, a string) has no .get.
+    if not isinstance(payload, dict):
+        payload = {}
 
-    text = payload.get("text", "")
-    creator_id = payload.get("creator_id", "")
+    text = payload.get("text")
+    creator_id = payload.get("creator_id")
 
-    if not text:
-        return jsonify({
-            "error": "empty text",
-            "message": "The submitted text field was empty; you must enter text to be evaluated.",
-            "you_sent": {
-                "text_length": len(payload.get("text", "")),
-                "creator_id": payload.get("creator_id")
-            }
-        })
+    if not isinstance(text, str):
+        return _reject(400, "bad_request",
+                       "Send the writing to check as a 'text' field.", creator_id)
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        return _reject(400, "bad_request",
+                       "Send who is submitting as a 'creator_id' field.", creator_id)
+    if len(text) > config.SUBMIT_MAX_CHARS:
+        return _reject(413, "text_too_long",
+                       f"Your text is too long to check. Please submit at most "
+                       f"{config.SUBMIT_MAX_CHARS:,} characters.", creator_id)
+    if len(text.split()) < config.SUBMIT_MIN_WORDS:
+        return _reject(400, "text_too_short",
+                       f"Your text is too short to check. Please submit at least "
+                       f"{config.SUBMIT_MIN_WORDS} words.", creator_id)
 
     content_id = str(uuid.uuid4())
 
     try:
         model_score = detector.model_signal(text)
     except ValueError as exc:
-        # Fewer than 3 tokens — nothing for the model to be surprised by.
-        return jsonify({"error": "text_too_short", "message": str(exc)}), 400
+        # Fewer than 3 tokens — nothing for the model to be surprised by. The
+        # word-count check above should catch this first; this is the backstop.
+        return _reject(400, "text_too_short", str(exc), creator_id)
     except detector.DetectorUnavailable as exc:
         # The model isn't downloaded or won't load — our problem, not the caller's.
         return jsonify({"error": "detector_unavailable", "message": str(exc)}), 503

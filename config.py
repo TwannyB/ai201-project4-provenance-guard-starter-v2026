@@ -47,6 +47,15 @@ DETECTOR_MODEL = os.getenv("AI201_DETECTOR_MODEL", "gpt2")
 DETECTOR_MAX_TOKENS = 400
 
 
+# ─── Input limits ────────────────────────────────────────────────────────────
+# What /submit refuses before scoring. Fewer words than this gives the signals
+# nothing to measure; more characters than this is refused outright (the
+# detector only reads the first ~300 words anyway).
+
+SUBMIT_MIN_WORDS = 5
+SUBMIT_MAX_CHARS = 10_000
+
+
 # ─── Scoring (Milestone 4) ───────────────────────────────────────────────────
 # How much each signal counts toward the combined score.
 #
