@@ -31,6 +31,8 @@ from flask import Flask, jsonify, request
 import audit
 import config
 import detector
+import scoring
+import stylometry
 
 app = Flask(__name__)
 
@@ -226,27 +228,35 @@ def submit():
         # The model isn't downloaded or won't load — our problem, not the caller's.
         return jsonify({"error": "detector_unavailable", "message": str(exc)}), 503
 
+    style_score = stylometry.style_signal(text)
+    combined_score = scoring.combine_signals(model_score, style_score)
+    guess, label = scoring.score_to_label(combined_score)
+
+    # How far the score sits from the middle: 0 at 0.5 (no idea), 1 at either
+    # end (very sure) — the same for a confident human call as an AI one.
+    confidence = round(abs(combined_score - 0.5) * 2, 4)
+
     # Log what the writer is about to be told, before telling them.
     audit.log_decision(
         content_id=content_id,
         creator_id=creator_id,
-        guess="unsure",
+        guess=guess,
         model_score=model_score,
-        style_score=None,
-        combined_score=None,
-        label="PLACEHOLDER label",
+        style_score=style_score,
+        combined_score=combined_score,
+        label=label,
         status="decided",
+        confidence=confidence,
     )
 
-    # Milestone 3, pass 2: signal one is real; the rest are placeholders.
     return jsonify({
         "content_id": content_id,
-        "guess": "unsure",
-        "confidence": 0.5,
-        "label": "PLACEHOLDER label",
+        "guess": guess,
+        "confidence": confidence,
+        "label": label,
         "model_score": model_score,
-        "style_score": None,
-        "combined_score": None,
+        "style_score": style_score,
+        "combined_score": combined_score,
     })
 
 
