@@ -139,11 +139,12 @@ It might wrongly classify predicatable writing, since it has a lower perplexity 
 ### Signal two — the style signal
 
 **What it measures:**
-It measures the shape of the input text and specific traits within the text.
+It measures the shape of the input text and specific traits within the text. The style score averages the spread score(how much sentence lengths vary) and punctuation score(punctuation usage), excluding the TTR from the calculation altogether. This is because the TTR scores didn't seem to separate AI from human text well when running tests. 
+
 
 **Why that might differ between human and AI writing:**
 AI writing tends to have even, mid-length sentences from a shorter ranged vocabulary, while human writing
-tends to be less consistent.
+tends to be less consistent. AI sentences were more even and AI used more punctuation when testing the stylometry functions on different inputs.
 
 **What it can't see:**
 The signal can't read, and doesn't pull any semantic knowledge from the text. Anything that changes the shape, like adding typos, breaking up sentences, or pasting a quotation can change the score.
@@ -164,8 +165,10 @@ The signal can't read, and doesn't pull any semantic knowledge from the text. An
      -->
 
 **The rule:**
+Each signal reads text as 'human' when it's below 0.5. If either signal reads human, the combined score is capped at 0.64, which is under the AI threshold so that the result can be unsure but never AI. If both read AI, then the combined score is their average.
 
 **The numbers:**
+The two signals both have a line of separation at 0.5, with below it being read as "human" and scores at 0.5 and above being read as "AI". If either signal lands in "human", the combined score is capped at 0.64. The combined score "unsure" range is from 0.35 to 0.65, with above and below it being "AI" and "Human" classifications, respectively. 
 
 **Where it lives:** `scoring.py::combine_signals`
 
@@ -173,6 +176,7 @@ The signal can't read, and doesn't pull any semantic knowledge from the text. An
      somewhere else, say where. -->
 
 **A case where my two signals split, and what my rule does with it:**
+My in-between text, a plain paragraph a person wrote, split my signals. The model signal scored it 0.77 since the model found its wording predictable, making it read as AI. The style signal scored it 0.16 since its sentences varied a lot in length and little punctuation was used, which caused it to be read as human. Because the style signal is below 0.5, my rule caps the combined score at 0.64, so it gets the "unsure" label instead of AI, which is the outcome I want. When two methods disagree the system can't truly know, and calling it AI would risk accusing a real writer of using AI generated content. On the model signal alone, the real writer in this case would have received a high confidence AI label, which is the false positive I traced in Milestone 1. My rule prevented this.
 
 
 

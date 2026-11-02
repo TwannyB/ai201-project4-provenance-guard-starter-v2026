@@ -74,6 +74,16 @@ WEIGHT_STYLE_SIGNAL = 0.5
 HUMAN_THRESHOLD = 0.35
 AI_THRESHOLD = 0.65
 
+# The combining rule: only AI when both signals agree.
+#
+# A signal "reads human" below this line, and "reads AI" at or above it.
+SIGNAL_HUMAN_LINE = 0.5
+
+# If either signal reads human, the combined score can't go above this. Kept
+# just under AI_THRESHOLD so a split can be unsure but never AI — and tied to
+# it, so moving the threshold moves the cap with it.
+DISAGREEMENT_CAP = AI_THRESHOLD - 0.01
+
 # ⚠️ One thing that catches people out in Milestone 5. A weighted average can
 # only land between its two inputs — so while `style_signal` is still the stub
 # returning 0.5, the combined score can never leave 0.25–0.75 no matter what

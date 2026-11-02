@@ -64,8 +64,13 @@ def sentence_length_spread(text: str) -> float:
     `stdev` raises on fewer than two values. Decide what that should return
     before the attack set decides for you.
     """
-    # TODO: replace this
-    return 0.0
+    # Drop "sentences" with no words (e.g. "!!!") so the mean can't be zero.
+    sentence_lengths = [n for n in (len(words(s)) for s in sentences(text)) if n > 0]
+    if len(sentence_lengths) < 2:
+        return 0.0
+
+    spread = statistics.stdev(sentence_lengths) / statistics.mean(sentence_lengths)
+    return spread
 
 
 def type_token_ratio(text: str) -> float:
@@ -80,8 +85,19 @@ def type_token_ratio(text: str) -> float:
     directly comparable on it, and if your test inputs vary a lot in length,
     that alone can look like a signal.
     """
-    # TODO: replace this
-    return 0.0
+    window_size = 50
+    w = words(text)
+    if not w:
+        return 0.0
+    if len(w) < window_size:
+        return len(set(w)) / len(w)
+
+    # Full 50-word chunks only; the leftover partial chunk at the end is dropped.
+    chunks = [w[i:i + window_size] for i in range(0, len(w) - window_size + 1, window_size)]
+
+    ratios = [len(set(chunk)) / len(chunk) for chunk in chunks]
+    return statistics.mean(ratios)
+
 
 
 def punctuation_density(text: str) -> float:
@@ -94,8 +110,13 @@ def punctuation_density(text: str) -> float:
         more interesting than full stops, because they vary more between
         writers.
     """
-    # TODO: replace this
-    return 0.0
+    punctuations = ",;:—()!?"
+    num_of_words = len(words(text))
+    if num_of_words == 0:
+        return 0.0
+
+    num_of_punct = sum(text.count(c) for c in punctuations)
+    return num_of_punct / num_of_words
 
 
 # ── Combining them ───────────────────────────────────────────────────────────
@@ -122,8 +143,38 @@ def style_signal(text: str) -> float:
     you trust it. Plain and ordinary, not formal: formal prose reads as *human*
     to signal one, and it is plain writing that gets accused.
     """
-    # TODO: replace this
-    return 0.5
+    # Nothing to measure. The route should refuse this before it gets here.
+    if not words(text):
+        return 0.5
+
+    # One sentence has no spread to measure, so it counts as neutral rather
+    # than as perfectly steady (which would read as maximally AI).
+    sentences_with_words = [s for s in sentences(text) if words(s)]
+    if len(sentences_with_words) < 2:
+        spread_score = 0.5
+    else:
+        spread_score = _scale(sentence_length_spread(text), SPREAD_ANCHORS)
+
+    punctuation_score = _scale(punctuation_density(text), PUNCTUATION_ANCHORS)
+
+    # type_token_ratio is left out: it measured 0.87–0.91 on all three
+    # calibration texts, so it couldn't tell them apart.
+    score = (spread_score + punctuation_score) / 2
+    return round(score, 4)
+
+
+# Anchors from three calibration texts (sure-AI, sure-human, in-between).
+# Each pair is (value that reads fully human, value that reads fully AI);
+# anything between is scaled linearly, anything past either end is clipped.
+SPREAD_ANCHORS = (0.60, 0.25)        # even sentence lengths read as AI
+PUNCTUATION_ANCHORS = (0.04, 0.12)   # comma-heavy text read as AI
+
+
+def _scale(value: float, anchors: tuple[float, float]) -> float:
+    """Map a raw measure onto 0–1, where 1 means more likely AI."""
+    human_end, ai_end = anchors
+    score = (value - human_end) / (ai_end - human_end)
+    return min(max(score, 0.0), 1.0)
 
 
 if __name__ == "__main__":
