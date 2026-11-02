@@ -71,7 +71,7 @@ All bodies are JSON. Every error response has the same shape:
 |---|---|---|
 | `content_id` | string (uuid) | ID for this submission. Needed to appeal |
 | `guess` | `"human"` / `"unsure"` / `"ai"` | Machine-readable verdict, exactly one of these lowercase strings |
-| `confidence` | float 0–1 | ___ <!-- the combined score, or how far it is from 0.5? --> |
+| `confidence` | float 0–1 | How sure the system is: how far `combined_score` is from 0.5, scaled to 0–1 (0 = no idea, 1 = very sure, either way) |
 | `label` | string | The plain-English sentence the writer sees |
 | `model_score` | float 0–1 | Signal one. Higher = more AI-like |
 | `style_score` | float 0–1 | Signal two. Higher = more AI-like |
@@ -128,47 +128,36 @@ All bodies are JSON. Every error response has the same shape:
 ### Signal one — the model signal
 
 **What it measures:**
-It measures how unpredicatable or predictable a sequence of words is, also known as the perplexity. 
+It measures how unpredictable or predictable a sequence of words is, also known as the perplexity. 
 
 **Why that might differ between human and AI writing:**
 Humans tend to have higher perplexity scores than AI when writing because humans are less predictable than AI.
 
 **What it can't see:**
-It might wrongly classify predicatable writing, since it has a lower perplexity score, as AI written, even if it's written by a human who happens to write predictably. That could include a new speaker or writer to the language or a younger writer. The reverse could also happen with more unpredicatble writing being classified as human even when it originated from AI because it has a unique sequence of words. In short, the score can't see authorship.
+It might wrongly classify predictable writing, since it has a lower perplexity score, as AI written, even if it's written by a human who happens to write predictably. That could include a new speaker or writer to the language or a younger writer. The reverse could also happen with more unpredictable writing being classified as human even when it originated from AI because it has a unique sequence of words. In short, the score can't see authorship.
 
 ### Signal two — the style signal
 
 **What it measures:**
-It measures the shape of the input text and specific traits within the text. The style score averages the spread score(how much sentence lengths vary) and punctuation score(punctuation usage), excluding the TTR from the calculation altogether. This is because the TTR scores didn't seem to separate AI from human text well when running tests. 
+It measures the shape of the input text and specific traits within the text. The style score averages the spread score (how much sentence lengths vary) and the punctuation score (commas, semicolons, colons, dashes, brackets, ! and ? per word), excluding the TTR from the calculation altogether. This is because the TTR scores didn't seem to separate AI from human text well when running tests (0.87–0.91 on all three of my calibration texts). Each measure is scaled to 0–1 using anchors from my calibration texts: spread 0.60 reads fully human and 0.25 fully AI; punctuation 0.04 reads fully human and 0.12 fully AI.
 
 
 **Why that might differ between human and AI writing:**
-AI writing tends to have even, mid-length sentences from a shorter ranged vocabulary, while human writing
-tends to be less consistent. AI sentences were more even and AI used more punctuation when testing the stylometry functions on different inputs.
+AI writing tends to have even, mid-length sentences, while human writing tends to be less consistent. My tests backed this up for spread: both AI texts had low spread (0.24, 0.33) and my casual and plain human texts had high spread (0.61, 0.56). My formal essay sat in between (0.36), so polished human writing looks more even too. Punctuation didn't hold up the way I expected. My first AI paragraph used far more punctuation than my human texts (0.114 against 0.046), so I set it up as "more punctuation reads AI". But on more texts, the other two AI samples used about as little punctuation as my human writing (0.043–0.048 against 0.036–0.057), so punctuation doesn't actually separate them.
 
 **What it can't see:**
 The signal can't read, and doesn't pull any semantic knowledge from the text. Anything that changes the shape, like adding typos, breaking up sentences, or pasting a quotation can change the score.
+
 ### The combining rule
 
 <!-- Write the rule in words, then give the numbers. What happens when the two
-     signals disagree? 
-     
-
-     Two things to decide and write down:
-
-      1. Which direction each measure points. Low spread means more AI-ish, so
-         it needs flipping. Work out which of your three need that.
-      2. How to get each onto a comparable scale. A raw type-token ratio sits
-         between 0 and 1; a raw punctuation count doesn't. Adding them
-         unscaled means whichever has the bigger numbers wins by default.
-     
-     -->
+     signals disagree? -->
 
 **The rule:**
 Each signal reads text as 'human' when it's below 0.5. If either signal reads human, the combined score is capped at 0.64, which is under the AI threshold so that the result can be unsure but never AI. If both read AI, then the combined score is their average.
 
 **The numbers:**
-The two signals both have a line of separation at 0.5, with below it being read as "human" and scores at 0.5 and above being read as "AI". If either signal lands in "human", the combined score is capped at 0.64. The combined score "unsure" range is from 0.35 to 0.65, with above and below it being "AI" and "Human" classifications, respectively. 
+The two signals both have a line of separation at 0.5, with below it being read as "human" and scores at 0.5 and above being read as "AI". If either signal lands in "human", the combined score is capped at 0.64 (a cap only: a lower score stays where it is). If both read AI, the combined score is a plain average, weighted 0.5 model and 0.5 style. On the combined score, 0.35 or below is labelled human, 0.65 or above is labelled AI, and anything between is unsure. All of these live in `config.py`: `SIGNAL_HUMAN_LINE`, `DISAGREEMENT_CAP`, `WEIGHT_MODEL_SIGNAL`, `WEIGHT_STYLE_SIGNAL`, `HUMAN_THRESHOLD` and `AI_THRESHOLD`.
 
 **Where it lives:** `scoring.py::combine_signals`
 
@@ -177,6 +166,24 @@ The two signals both have a line of separation at 0.5, with below it being read 
 
 **A case where my two signals split, and what my rule does with it:**
 My in-between text, a plain paragraph a person wrote, split my signals. The model signal scored it 0.77 since the model found its wording predictable, making it read as AI. The style signal scored it 0.16 since its sentences varied a lot in length and little punctuation was used, which caused it to be read as human. Because the style signal is below 0.5, my rule caps the combined score at 0.64, so it gets the "unsure" label instead of AI, which is the outcome I want. When two methods disagree the system can't truly know, and calling it AI would risk accusing a real writer of using AI generated content. On the model signal alone, the real writer in this case would have received a high confidence AI label, which is the false positive I traced in Milestone 1. My rule prevented this.
+
+### Calibration: four deliberate inputs
+
+I sent each of these through `POST /submit` (plus my plain paragraph as a fifth):
+
+| Input | model | style | combined | label |
+|---|---|---|---|---|
+| Clearly AI | 0.886 | 0.516 | 0.701 | high-confidence AI |
+| Clearly human (casual) | 0.244 | 0.000 | 0.122 | high-confidence human |
+| Formal human (my essay) | 0.516 | 0.387 | 0.452 | unsure |
+| Lightly-edited AI | 0.814 | 0.439 | 0.626 | unsure |
+| Plain human (my split case) | 0.765 | 0.156 | 0.461 | unsure |
+
+Neither of my human texts that could have been accused was: the formal essay and the plain paragraph both landed in unsure. All three labels were reachable.
+
+**The miss:** the lightly-edited AI text got through as unsure. Looking at the two signals separately, the model signal read it correctly as AI (0.814), but the style signal read it as human (0.439), which triggered my cap. Splitting style into its two measures, spread scored it as AI-like (0.329) but punctuation scored it as human (0.048, almost at the 0.04 human anchor). Punctuation is the measure that's off: its anchors came from one comma-heavy AI paragraph, and the other AI texts don't use much punctuation. Dropping punctuation would catch this text (combined 0.794, AI), but it would also push my formal essay to 0.605, close to the 0.65 AI line. I kept punctuation for now, because missing some lightly-edited AI costs less than accusing a real writer.
+
+**A short-text limitation:** the minimum is 5 words, and "The cat sat down quietly." passed and was labelled human. A label on five words is mostly a guess.
 
 
 
@@ -307,14 +314,14 @@ The original `decided` entry stays where it was; the appeal is a new
 **Moment 1**
 
 - *What I asked for:* I was confused about where to start and where to look in order to  fill out the seven steps
-- *What came back
-- *What I changed:*
+- *What came back:* a walkthrough of the repo and a draft seven-step trace naming each file a submission passes through.
+- *What I changed:* I wrote the trace in my own words, and further broke down exactly what the blind spot of using stylometry meant in simple terms: "typos or a pasted quote can move the score when they shouldn't".
 
 **Moment 2**
 
-- *What I asked for:* I wanted to confirm my knowledge of the two endpoint shapes was correct
-- *What came back:*
-- *What I changed:* I confirmed Claude's suggestion to add notes to the README describing the two endpoints. 
+- *What I asked for:* I asked AI to look over the three functions I wrote for stylometry.py.
+- *What came back:* Claude pointed out five bugs that would cause errors.
+- *What I changed:* I reviewed and accepted Claude's changes to the functions that still used my own original logic. The bugs included mistakes like comparing the list itself to 2 instead of its length, and dividing by the word count without checking if it's zero. Claude replaced a while loop I made for one of the functions with a one-line range, so I checked that it gave me the same result(properly chunking the text input) before keeping it. 
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
