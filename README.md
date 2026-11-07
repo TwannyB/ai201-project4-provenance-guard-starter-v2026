@@ -323,6 +323,25 @@ The original `decided` entry stays where it was; the appeal is a new
 - *What came back:* Claude pointed out five bugs that would cause errors.
 - *What I changed:* I reviewed and accepted Claude's changes to the functions that still used my own original logic. The bugs included mistakes like comparing the list itself to 2 instead of its length, and dividing by the word count without checking if it's zero. Claude replaced a while loop I made for one of the functions with a one-line range, so I checked that it gave me the same result(properly chunking the text input) before keeping it. 
 
+**Moment 3**
+
+- *What I asked for:* 
+I asked Claude for options to improve the system before running the "after" tests. I asked it for a rundown of how each would be implemented and told it not to change anything until I'd picked one.
+- *What came back:* 
+four options, each simulated against my recorded signal scores from the before runs:
+  - A: stricter word counting in the route
+  - B: recalibrating signal two's anchors
+  - C1: weighting signal one at 0.7
+  - C2: raising SIGNAL_HUMAN_LINE from 0.5 to 0.6
+- *What I changed:* 
+I chose C2 and set aside the others. I didn't pick C1 because it wouldn't just moved the false accusation somewhere else, and I didn't pick B because the anchors would then be tuned on my own essays, risking overfitting. This led me to choose A and C2 together, which was a change I could trace results back to easily.
+
+**Moment 4**
+
+- *What I asked for:* I asked for help naming the stage and mechanisms responsible for each miss and broken attack. I gave Claude my own guesses about where I though the issue was(the scoring mechanisms for both signals for both criterions 1 and 2).
+- *What came back:*  Claude gave back a breakdown of the style measures for both texts, and also showed that a neutral style score would cause both texts to land in unsure, so signal two was the deciding stage that we needed to focus on, not signal one. 
+- *What I changed:* 
+I wrote criterion 1 and criterion 2's diagnoses in my own words, then had Claude check them, add the supporting numbers, and fix my typos. The detail about the safeguard line is what pointed me to the improvemnet in Moment 3. I fixed the comining rule instead of signal two because it was a smaller and more traceable change. 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
@@ -356,7 +375,66 @@ can look like one. -->
 <!-- Every attack with its outcome and a held-or-broke mark.
      `run_attacks.py --label before` produces the table. -->
 
+Produced by `run_attacks.py::main` against `app.py::submit`, copied from `results/attack_run_2026-11-06_1345.md`. Totals: **47 held, 9 broke** out of 56.
 
+| ID | Family | Targeting | Status | Content ID | Guess | Score | Verdict |
+|---|---|---|---|---|---|---|---|
+| EV01 | evasion | signal two: typos raise word variety | 200 | `34188ea4-10be-4006-b8a1-dad3c5cf37a9` | human | 0.337 |BROKE|
+| EV02 | evasion | signal two: broken-up sentences raise length spread | 200 | `969bc188-58d8-41dd-ba78-84e7660d3f40` | human | 0.406 |BROKE|
+| EV03 | evasion | signal two: a pasted quotation changes the shape | 200 | `a9338fe7-a169-43ca-8053-e4bfb1f22fe4` | unsure | 0.065 |HELD|
+| EV04 | evasion | signal one: unusual words raise perplexity | 200 | `4fb84c31-65b0-4044-9102-4be1175cb237` | unsure | 0.111 |HELD|
+| EV05 | evasion | both signals: heavy human editing pass | 200 | `d9c18b93-9546-4d4c-9f82-3a44102100e8` | human | 0.548 |BROKE|
+| EV06 | evasion | signal two: one very long sentence and one very short | 200 | `97d19d2a-8013-45ed-9478-f6e13029dce0` | human | 0.427 |BROKE|
+| EV07 | evasion | signal two: padding with punctuation | 200 | `33328c0c-9f49-4502-9ade-ee451c2a771f` | ai | 0.336 |HELD|
+| EV08 | evasion | signal one: text below the token window | 200 | `cb81677a-eede-4fdf-a64b-d259bb1691a1` | human | 0.302 |BROKE|
+| EV09 | evasion | both: AI text with a human opening paragraph bolted on | 200 | `095d629f-8b7b-47fb-aaee-4707e042c1dd` | unsure | 0.075 |HELD|
+| EV10 | evasion | signal two: repeated stanza structure | 200 | `5dc006c0-4bb8-4981-b1a5-058d99f8651a` | unsure | 0.274 |HELD|
+| FP01 | false_positive | plain, clear human writing with no flourishes | 200 | `e3a4fb22-06dc-46c6-86ce-f1d38c00e2f5` | unsure | 0.179 |HELD|
+| FP02 | false_positive | human writing in a formal register | 200 | `c5590d44-a136-401d-9ff1-d5c2e2a840d9` | unsure | 0.239 |HELD|
+| FP03 | false_positive | a non-native English speaker writing carefully | 200 | `1cda8d6c-f60f-42ae-aeff-204630608f13` | unsure | 0.193 |HELD|
+| FP04 | false_positive | a student essay written to a rubric | 200 | `9e14d43d-31fa-4789-a67b-fe50029728c3` | unsure | 0.166 |HELD|
+| FP05 | false_positive | technical documentation written by a person | 200 | `52379b3f-e5f2-41b0-8864-1f5e561f2e86` | unsure | 0.262 |HELD|
+| FP06 | false_positive | a person imitating a formal template | 200 | `ad0e70f9-7d9b-4f89-a181-b4d8d696b8b4` | unsure | 0.003 |HELD|
+| FP07 | false_positive | human writing that repeats a phrase deliberately | 200 | `ca092b67-a199-4616-9878-c7e2e3e75ee3` | unsure | 0.118 |HELD|
+| FP08 | false_positive | very short genuine human submission | 200 | `510d7a35-20eb-4ade-b212-cd7e2a8996ea` | human | 0.439 |HELD|
+| PI01 | prompt_injection | instruction to ignore the check | 200 | `3009b9d3-8916-4395-acef-5b8c01563625` | human | 0.537 |BROKE|
+| PI02 | prompt_injection | instruction disguised as a system message | 200 | `f464e8ce-0909-4ac4-8fcd-12050eb6b07f` | human | 0.768 |BROKE|
+| PI03 | prompt_injection | instruction wrapped in the writer's voice | 200 | `5c3cbf79-2f53-425d-82a1-3b45f4447187` | unsure | 0.052 |HELD|
+| PI04 | prompt_injection | attempt to make the label text hostile | 200 | `b3d33980-8b37-47a6-a0d2-180eb9656e8c` | unsure | 0.030 |HELD|
+| PI05 | prompt_injection | attempt to inject into the audit log | 200 | `d7cfa75d-18f6-455f-8fb4-93a48d7b1112` | ai | 0.324 |HELD|
+| PI06 | prompt_injection | instruction plus real human text | 200 | `e1c8ffa8-4b01-4c59-9488-fa76dbc40772` | unsure | 0.221 |HELD|
+| MF01 | malformed | text is only whitespace | 400 | `—` | — | — |HELD|
+| MF02 | malformed | text is a single character | 400 | `—` | — | — |HELD|
+| MF03 | malformed | text is control characters | 400 | `—` | — | — |HELD|
+| MF04 | malformed | text is only punctuation | 200 | `453b2ab6-aaa3-4a5c-8eb0-12780a75eea1` | human | 0.489 |BROKE|
+| MF05 | malformed | text is a very long single word | 400 | `—` | — | — |HELD|
+| MF06 | malformed | text is emoji only | 400 | `—` | — | — |HELD|
+| MF07 | malformed | text is right-to-left script | 200 | `1eca6c5e-cac8-483d-aafb-79d335b6e3a2` | ai | 0.406 |BROKE|
+| MF08 | malformed | text is 60,000 characters | 413 | `—` | — | — |HELD|
+| RQ01 | malformed | no text field at all | 400 | `—` | — | — |HELD|
+| RQ02 | malformed | no creator_id | 400 | `—` | — | — |HELD|
+| RQ03 | malformed | text is a number | 400 | `—` | — | — |HELD|
+| RQ04 | malformed | text is a list | 400 | `—` | — | — |HELD|
+| RQ05 | malformed | text is null | 400 | `—` | — | — |HELD|
+| RQ06 | malformed | creator_id is an object | 400 | `—` | — | — |HELD|
+| RQ07 | malformed | body is a JSON array, not an object | 400 | `—` | — | — |HELD|
+| RQ08 | malformed | body is unparseable JSON | 400 | `—` | — | — |HELD|
+| RQ09 | malformed | body is empty | 400 | `—` | — | — |HELD|
+| RQ10 | malformed | body is form-encoded, not JSON | 400 | `—` | — | — |HELD|
+| RQ11 | malformed | body is JSON claiming to be plain text | 400 | `—` | — | — |HELD|
+| RQ12 | malformed | deeply nested JSON | 400 | `—` | — | — |HELD|
+| FL01_01 | flood_same_creator | 20 rapid submissions from one creator | 200 | `53b858a1-72a1-4b14-a8aa-f4b6533d5fa3` | human | 0.721 |HELD|
+| FL01_02 | flood_same_creator | 20 rapid submissions from one creator | 200 | `d58ffcbd-2b66-48f3-a30a-16a2231bfa48` | human | 0.721 |HELD|
+| FL01_03 | flood_same_creator | 20 rapid submissions from one creator | 200 | `3203992a-f462-48d3-95f2-38e34d8a904e` | human | 0.721 |HELD|
+| FL01_04 | flood_same_creator | 20 rapid submissions from one creator | 200 | `4d66e9f5-5e29-48b6-9ede-9591e2868db1` | human | 0.721 |HELD|
+| FL01_05 | flood_same_creator | 20 rapid submissions from one creator | 200 | `2a38d04e-cb79-4724-bb1b-4f1badd028b4` | human | 0.721 |HELD|
+| FL01_06 | flood_same_creator | 20 rapid submissions from one creator | 200 | `823e3a73-c3a3-4d58-bb29-c3a4a65b7853` | human | 0.721 |HELD|
+| FL01_07 | flood_same_creator | 20 rapid submissions from one creator | 200 | `5d62b5c8-c0db-4695-9949-886c4549c142` | human | 0.721 |HELD|
+| FL01_08 | flood_same_creator | 20 rapid submissions from one creator | 200 | `0e1f9ad1-4c30-4f53-9480-affb5184e650` | human | 0.721 |HELD|
+| FL01_09 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — |HELD|
+| FL01_10 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — |HELD|
+| FL01_11 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — |HELD|
+| FL01_12 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — |HELD|
 
 **Ten audit log entries from the run**
 
@@ -836,18 +914,97 @@ On the human side, the same two texts from criterion 1 (0.673 and 0.698) pull th
 
 **What I changed:**
 
+I changed the `SIGNAL_HUMAN_LINE` setting in `config.py` from 0.5 to 0.6. Before, my combining rule only let the AI label through when both signals agreed, meaning that both were at 0.5 or above. Now they both have to be at 0.6 or above. If either one is below 0.6, the combined score is capped at 0.64, just under the AI threshold, so the worst label it can get is unsure.
+
+
 **Which diagnosis pointed at it:**
+The criterion 1 diagnosis pointed at it. One of my human writings, `MY_PLAIN`, was labelled as AI and had a combined score of 0.673. The model score was 0.578, which was only just above the 0.5 line, but since it was above it, the safeguard didn't apply and the high style score of 0.767 carried it to an AI classification. By moving the safeguard's line up, a borderline signal like that no longer counts as agreeing. The diagnosis really named two stages, which were signal two and the combining rule, but the combining rule was what I ended up changing because it's a smaller change and didn't involve retuning the style signal on my own essays, which risked overfitting and making a less generally effective system. 
 
 ### Attack Run — After
 
 <!-- Same format. `run_attacks.py --label after` -->
 
+Produced by `run_attacks.py::main` against `app.py::submit`, copied from `results/attack_run_2026-11-07_1124_after~.md`. Totals: **48 held, 8 broke** (before: 47 held, 9 broke). Only two attacks changed: MF07 and EV07 went from `ai` to `unsure`; every other row returned the same status and guess as before.
 
+| ID | Family | Targeting | Status | Content ID | Guess | Score | Verdict |
+|---|---|---|---|---|---|---|---|
+| EV01 | evasion | signal two: typos raise word variety | 200 | `3c434daa-4904-489b-939f-a44c081f36f0` | human | 0.337 | BROKE |
+| EV02 | evasion | signal two: broken-up sentences raise length spread | 200 | `7b75b5d8-2fe8-43a7-9f82-5bc90737e703` | human | 0.406 | BROKE |
+| EV03 | evasion | signal two: a pasted quotation changes the shape | 200 | `33425549-a151-488b-b959-749673e96dc5` | unsure | 0.065 | HELD |
+| EV04 | evasion | signal one: unusual words raise perplexity | 200 | `acdf8cbf-3a5b-46b3-95af-4f8acbc3da27` | unsure | 0.111 | HELD |
+| EV05 | evasion | both signals: heavy human editing pass | 200 | `da7eb2dc-da22-4aaf-a1f7-8ccf8a8d87f6` | human | 0.548 | BROKE |
+| EV06 | evasion | signal two: one very long sentence and one very short | 200 | `283dca24-a9bb-435a-b53c-934b10eec19a` | human | 0.427 | BROKE |
+| EV07 | evasion | signal two: padding with punctuation | 200 | `f642a296-b1d0-476f-9097-04275f1b8321` | unsure (was `ai`) | 0.280 | HELD |
+| EV08 | evasion | signal one: text below the token window | 200 | `c4609bbe-46c8-422f-a548-ae0241fcdfae` | human | 0.302 | BROKE |
+| EV09 | evasion | both: AI text with a human opening paragraph bolted on | 200 | `7c968973-1519-41e6-ad29-6fb201f5ed81` | unsure | 0.075 | HELD |
+| EV10 | evasion | signal two: repeated stanza structure | 200 | `7a1349f2-29a3-4857-868c-c7e1cb82f493` | unsure | 0.274 | HELD |
+| FP01 | false_positive | plain, clear human writing with no flourishes | 200 | `b42ad956-e914-4adf-ae99-80b7bb62c5a8` | unsure | 0.179 | HELD |
+| FP02 | false_positive | human writing in a formal register | 200 | `b33ece9c-6a45-4019-8138-1a672b65001e` | unsure | 0.239 | HELD |
+| FP03 | false_positive | a non-native English speaker writing carefully | 200 | `abee1ddc-1e0b-46bc-92fb-310e71d8f0a4` | unsure | 0.193 | HELD |
+| FP04 | false_positive | a student essay written to a rubric | 200 | `03e451f6-d094-4eeb-8555-8fe4370bbde5` | unsure | 0.166 | HELD |
+| FP05 | false_positive | technical documentation written by a person | 200 | `d0d514b8-d719-4f8f-b03e-6cfa2780b40d` | unsure | 0.262 | HELD |
+| FP06 | false_positive | a person imitating a formal template | 200 | `fdb23911-ec5e-405e-86f5-3a8b9f682e9b` | unsure | 0.003 | HELD |
+| FP07 | false_positive | human writing that repeats a phrase deliberately | 200 | `05f9fe81-80f6-4ab5-bf5e-50ae34fe5aaf` | unsure | 0.118 | HELD |
+| FP08 | false_positive | very short genuine human submission | 200 | `d5fb42cd-68e2-4e81-8bcd-0a3d97881199` | human | 0.439 | HELD |
+| PI01 | prompt_injection | instruction to ignore the check | 200 | `57c1c2ba-4ea9-49d6-b22c-a4464471ee78` | human | 0.537 | BROKE |
+| PI02 | prompt_injection | instruction disguised as a system message | 200 | `a7c66c4c-8eb0-434a-ac0e-3cd3c5d7a3a6` | human | 0.768 | BROKE |
+| PI03 | prompt_injection | instruction wrapped in the writer's voice | 200 | `f9f1d813-180f-4dd0-9757-6b530040112e` | unsure | 0.052 | HELD |
+| PI04 | prompt_injection | attempt to make the label text hostile | 200 | `3fed96ca-49d7-45df-87bc-9f9fcc799a03` | unsure | 0.030 | HELD |
+| PI05 | prompt_injection | attempt to inject into the audit log | 200 | `9bd8cbb2-8768-414b-9197-ef5adcdd3695` | ai | 0.324 | HELD |
+| PI06 | prompt_injection | instruction plus real human text | 200 | `4d3b9b8e-5fa2-4cfc-aa9e-e8ba0e7d46ed` | unsure | 0.221 | HELD |
+| MF01 | malformed | text is only whitespace | 400 | `—` | — | — | HELD |
+| MF02 | malformed | text is a single character | 400 | `—` | — | — | HELD |
+| MF03 | malformed | text is control characters | 400 | `—` | — | — | HELD |
+| MF04 | malformed | text is only punctuation | 200 | `f90b231c-aedc-4e2c-89dc-6d44a5c598b4` | human | 0.489 | BROKE |
+| MF05 | malformed | text is a very long single word | 400 | `—` | — | — | HELD |
+| MF06 | malformed | text is emoji only | 400 | `—` | — | — | HELD |
+| MF07 | malformed | text is right-to-left script | 200 | `87dba64b-694d-4de5-8aa5-3eee94b1908a` | unsure (was `ai`) | 0.280 | HELD |
+| MF08 | malformed | text is 60,000 characters | 413 | `—` | — | — | HELD |
+| RQ01 | malformed | no text field at all | 400 | `—` | — | — | HELD |
+| RQ02 | malformed | no creator_id | 400 | `—` | — | — | HELD |
+| RQ03 | malformed | text is a number | 400 | `—` | — | — | HELD |
+| RQ04 | malformed | text is a list | 400 | `—` | — | — | HELD |
+| RQ05 | malformed | text is null | 400 | `—` | — | — | HELD |
+| RQ06 | malformed | creator_id is an object | 400 | `—` | — | — | HELD |
+| RQ07 | malformed | body is a JSON array, not an object | 400 | `—` | — | — | HELD |
+| RQ08 | malformed | body is unparseable JSON | 400 | `—` | — | — | HELD |
+| RQ09 | malformed | body is empty | 400 | `—` | — | — | HELD |
+| RQ10 | malformed | body is form-encoded, not JSON | 400 | `—` | — | — | HELD |
+| RQ11 | malformed | body is JSON claiming to be plain text | 400 | `—` | — | — | HELD |
+| RQ12 | malformed | deeply nested JSON | 400 | `—` | — | — | HELD |
+| FL01_01 | flood_same_creator | 20 rapid submissions from one creator | 200 | `78e81783-49a4-426f-97fd-272a719ffe61` | human | 0.721 | HELD |
+| FL01_02 | flood_same_creator | 20 rapid submissions from one creator | 200 | `5a70f630-29fb-48bc-801e-4a07a69d11c7` | human | 0.721 | HELD |
+| FL01_03 | flood_same_creator | 20 rapid submissions from one creator | 200 | `98d2cb84-e510-43d8-bbbd-233d19f3bd44` | human | 0.721 | HELD |
+| FL01_04 | flood_same_creator | 20 rapid submissions from one creator | 200 | `2721aaa7-cdb7-4cd1-ba18-a4eb38be25ba` | human | 0.721 | HELD |
+| FL01_05 | flood_same_creator | 20 rapid submissions from one creator | 200 | `5f949fd1-2651-4ae3-b0f0-da20dcef28e7` | human | 0.721 | HELD |
+| FL01_06 | flood_same_creator | 20 rapid submissions from one creator | 200 | `14942c55-0007-431b-9f65-163c5b412e4f` | human | 0.721 | HELD |
+| FL01_07 | flood_same_creator | 20 rapid submissions from one creator | 200 | `818e844f-c0e0-4449-96fd-400a97b76768` | human | 0.721 | HELD |
+| FL01_08 | flood_same_creator | 20 rapid submissions from one creator | 200 | `2b0801cf-3d43-4b98-acc8-fc07f5de8a18` | human | 0.721 | HELD |
+| FL01_09 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
+| FL01_10 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
+| FL01_11 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
+| FL01_12 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
+
+**Run log — after**
+
+Produced by `run_eval.py::main` against `app.py::submit`, scored by `scoring.py::combine_signals`; from `results/run_2026-11-07_1126_after.md`. All three trials were identical again.
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. False positives on my own writing | ≤ 1 of 10 labelled `ai` | 1 of 10 | 1 of 10 | 1 of 10 | **PASS** (before: MISS, 2 of 10) |
+| 2. Score spread | AI avg − human avg ≥ 0.45 | 0.231 (0.675 − 0.445) | 0.231 | 0.231 | **MISS** (before: 0.236) |
+| 3. Appeal path | 5/5 appeals → 200 `under_review`, logged with original kept; fake ID → 404, nothing logged | 5/5, 404 ✓, log +0 | 5/5, 404 ✓, log +0 | 5/5, 404 ✓, log +0 | **PASS** (from `results/appeal_trials_2026-11-07_1133_after.md`) |
+| 4. Bad input | 5 × 400, 1 × 413, no 500 | 6/6 | 6/6 | 6/6 | **PASS** |
+| 5. Label coverage | each label reached by its own group | ai ✓ human ✓ unsure ✓ | ai ✓ human ✓ unsure ✓ | ai ✓ human ✓ unsure ✓ | **PASS** |
 
 **Did it help, and how do I know:**
 
 <!-- Widening the unsure band usually fixes one problem and creates another.
      Reporting that trade honestly is worth full credit. -->
+
+Yes, it did help, as the system now passes criterion 1. I know because I re-ran the same evals and attack set after the change: my own writing labelled AI went from 2 of 10 to 1 of 10 in all three trials (`results/run_2026-11-06_2122_before.md` vs `results/run_2026-11-07_1126_after.md`), and the attack run went from 47 held, 9 broke to 48 held, 8 broke. It also made MF07 go from ai to unsure, so the right-to-left writer is no longer accused.
+
+However, it only just passes: `HUMAN_ONE` is still labelled AI, because both of its signals are above 0.6 (model 0.722, style 0.675), so one more false positive would fail criterion 1 again. The change also made a known AI sample, `AI_SAMPLE`, go from ai to unsure, along with EV07, and it made the gap between the AI and human group averages slightly worse (0.236 to 0.231), since capping scores brought down the AI group average. Making the AI label harder to reach protects real writers but allows more AI text to land in unsure.
 
 
 
@@ -858,13 +1015,20 @@ On the human side, the same two texts from criterion 1 (0.673 and 0.698) pull th
 <!-- For each attack still getting through and each criterion still missed:
      what you'd do, and why you stopped. -->
 
+Criterion 2 is still broken (gap 0.231 against a target of 0.45). To try to fix it, I'd make signal two more effective at separating AI text from human text. For example, I'd find a style measure to incorporate that doesn't penalize careful long-form writing, or weight signal one more heavily once I fix signal two. I stopped here because making one simple change didn't get close to fixing it. To get a gap of 0.45 between the averages, a better signal is needed, along with more test texts so the system isn't tailored to my own essays only.
+
+Signal two is also easy to fool with sentence rhythm, shown by EV02, EV06, and PI01 still getting labelled human. To fix it, I'd make the sentence-length spread count less. I stopped here because any change to signal two moves both false positives and evasions, and I'd prefer a change with an effect I can clearly trace.
+
+The route still accepts texts whose signals it can't measure. MF04 (punctuation only) is still labelled human, and MF07 (right-to-left script) is no longer accused but is still accepted and given a verdict. To fix it, I'd count the words in each input with `stylometry.words()` instead of `split()`, and reject texts with too few real words. I stopped here because I had already made one change.
+
+EV01 and PI02 (signal one reads surprising tokens like typos or fake system text as human), EV08 (too short to measure reliably), and EV05 (so heavily human-edited that nothing is left to detect) also still get through. I didn't attempt these.
 
 
 **The trade I'd make if this ran for real:**
 
 <!-- Two sentences. Fewer wrong accusations means more AI text getting through.
      Say which way you'd go and WHO PAYS FOR IT. -->
-
+I'd keep erring towards "unsure", because a writer wrongly labelled as AI pays a large cost, while AI that slips into unsure costs the site and honest writers only a little each. The people at the highest risk are honest writers competing with undetected AI work, which I'd accept as a flaw.
 
 
 <!-- ═════════════════════════════════════════════════════════════════════

@@ -86,7 +86,9 @@ AI_THRESHOLD = 0.65
 # The combining rule: only AI when both signals agree.
 #
 # A signal "reads human" below this line, and "reads AI" at or above it.
-SIGNAL_HUMAN_LINE = 0.5
+# Unit 8: raised from 0.5 to 0.6. MY_PLAIN's model score of 0.578 sat just
+# above 0.5, so the cap never applied and my own writing was labelled AI.
+SIGNAL_HUMAN_LINE = 0.6
 
 # If either signal reads human, the combined score can't go above this. Kept
 # just under AI_THRESHOLD so a split can be unsure but never AI — and tied to
