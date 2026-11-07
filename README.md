@@ -820,7 +820,15 @@ Produced by `run_eval.py::main`, which sent each request to `app.py::submit`; co
 
      Look for a pattern. Five failures on one signal is one problem, not five. -->
 
+Criterion 1:
+The first criterion was missed because two of my human-written texts, MY_PLAIN (combined 0.673) and HUMAN_ONE (combined 0.698), were labelled AI in all three trials. The stage responsible in both was signal two, `stylometry.style_signal`. It treats a sentence-length spread of 0.25 or lower as fully AI (`SPREAD_ANCHORS = (0.60, 0.25)`), and it counts commas, colons, and parentheses as AI-like. Both texts are careful long-form writing with long, evenly sized, comma-heavy sentences (spread 0.224 and 0.259), and MY_PLAIN's citations like "(McGrath 23)" add parentheses on top. That gave them style scores of 0.767 and 0.675.
 
+In both cases, signal one was only borderline (model scores 0.578 and 0.722), and it was the style score that pushed the writing into high-confidence AI. With a neutral style score of 0.5, they would have combined to 0.539 and 0.611 and landed in unsure. The combining rule didn't catch it either: my safeguard only caps the score below the AI threshold (into unsure) if either signal is under 0.5, and MY_PLAIN's model score of 0.578 was just above that line, so the cap never applied.
+
+Criterion 2:
+The average combined scores of the AI-written group (0.687) and the human-written group (0.451) are too close: a gap of 0.236 against my target of 0.45, the same in all three trials. The problem is on both ends: the human average is too high, and the AI average is too low. The stage responsible is again signal two, `stylometry.style_signal`, and more specifically its sentence-length spread and comma-density measures, because the two don't separate the tested AI texts from my writing.
+
+On the human side, the same two texts from criterion 1 (0.673 and 0.698) pull the average up; the other three human texts average 0.295. On the AI side, signal two reads some of the AI texts as human. AI_REMOTE has varied sentence lengths (spread 0.434), so its style score is only 0.267 and its combined score falls to 0.459 (unsure), and AI_SAMPLE's style score is only 0.516. The combining rule makes this worse: it weights both signals equally (0.5 each), so when signal two can't tell the groups apart, it cuts the gap that signal one creates roughly in half.
 
 ---
 
